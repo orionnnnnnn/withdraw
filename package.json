@@ -1,0 +1,23 @@
+{
+  "name": "withdraw-chrome-extension",
+  "version": "1.0.0",
+  "description": "Chrome extension to restore recently closed tabs",
+  "main": "dist/background.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rmdir /s /q dist 2>nul || true && mkdir dist"
+  },
+  "keywords": [
+    "chrome-extension",
+    "tabs",
+    "restore",
+    "browser"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "typescript": "^5.0.0"
+  }
+}
