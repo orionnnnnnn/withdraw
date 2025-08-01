@@ -20,13 +20,17 @@ const elements = {
   errorState: document.getElementById('error-state')!,
   retryBtn: document.getElementById('retry-btn')! as HTMLButtonElement,
   clearAllBtn: document.getElementById('clear-all-btn')! as HTMLButtonElement,
-  tabsCount: document.getElementById('tabs-count')!
+  tabsCount: document.getElementById('tabs-count')!,
+  searchInput: document.getElementById('search-input')! as HTMLInputElement,
+  clearSearchBtn: document.getElementById('clear-search-btn')! as HTMLButtonElement
 };
 
 /**
  * 应用状态
  */
 let closedTabs: ClosedTab[] = [];
+let filteredTabs: ClosedTab[] = [];
+let searchQuery: string = '';
 
 /**
  * 显示指定状态，隐藏其他状态
@@ -143,26 +147,57 @@ function createTabItem(tab: ClosedTab): HTMLElement {
 }
 
 /**
+ * 过滤标签页
+ */
+function filterTabs(): void {
+  if (!searchQuery.trim()) {
+    filteredTabs = [...closedTabs];
+  } else {
+    const query = searchQuery.toLowerCase();
+    filteredTabs = closedTabs.filter(tab =>
+      tab.title.toLowerCase().includes(query) ||
+      tab.url.toLowerCase().includes(query)
+    );
+  }
+}
+
+/**
  * 渲染标签页列表
  */
 function renderTabsList(): void {
   elements.tabsList.innerHTML = '';
-  
+
+  // 应用搜索过滤
+  filterTabs();
+
   if (closedTabs.length === 0) {
     showState('empty');
     elements.clearAllBtn.disabled = true;
+  } else if (filteredTabs.length === 0 && searchQuery.trim()) {
+    // 有搜索但无结果
+    showState('empty');
+    elements.emptyState.innerHTML = `
+      <div class="empty-icon">🔍</div>
+      <p class="empty-text">未找到匹配的标签页</p>
+      <p class="empty-hint">尝试使用不同的关键词搜索</p>
+    `;
+    elements.clearAllBtn.disabled = false;
   } else {
     showState('list');
     elements.clearAllBtn.disabled = false;
-    
-    closedTabs.forEach(tab => {
+
+    filteredTabs.forEach(tab => {
       const item = createTabItem(tab);
       elements.tabsList.appendChild(item);
     });
   }
-  
+
   // 更新计数
-  elements.tabsCount.textContent = closedTabs.length.toString();
+  const displayCount = searchQuery.trim() ? filteredTabs.length : closedTabs.length;
+  const countText = searchQuery.trim() ?
+    `${displayCount}/${closedTabs.length} 个标签页` :
+    `${closedTabs.length} 个已关闭标签页`;
+  elements.tabsCount.textContent = countText;
 }
 
 /**
@@ -229,14 +264,53 @@ async function clearAllTabs(): Promise<void> {
 }
 
 /**
+ * 处理搜索输入
+ */
+function handleSearchInput(): void {
+  searchQuery = elements.searchInput.value;
+
+  // 显示/隐藏清空搜索按钮
+  if (searchQuery.trim()) {
+    elements.clearSearchBtn.classList.remove('hidden');
+  } else {
+    elements.clearSearchBtn.classList.add('hidden');
+  }
+
+  // 重新渲染列表
+  renderTabsList();
+}
+
+/**
+ * 清空搜索
+ */
+function clearSearch(): void {
+  elements.searchInput.value = '';
+  searchQuery = '';
+  elements.clearSearchBtn.classList.add('hidden');
+  renderTabsList();
+  elements.searchInput.focus();
+}
+
+/**
  * 初始化事件监听器
  */
 function initEventListeners(): void {
   // 重试按钮
   elements.retryBtn.addEventListener('click', loadClosedTabs);
-  
+
   // 清空按钮
   elements.clearAllBtn.addEventListener('click', clearAllTabs);
+
+  // 搜索输入
+  elements.searchInput.addEventListener('input', handleSearchInput);
+  elements.searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      clearSearch();
+    }
+  });
+
+  // 清空搜索按钮
+  elements.clearSearchBtn.addEventListener('click', clearSearch);
 }
 
 /**
