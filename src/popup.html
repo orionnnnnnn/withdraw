@@ -40,7 +40,17 @@
                 <p class="empty-hint">关闭一些标签页后，它们会出现在这里</p>
             </div>
 
-            <!-- 标签页列表 -->
+            <!-- 置顶标签页区域 -->
+            <div id="pinned-tabs" class="pinned-tabs hidden">
+                <div class="pinned-header">
+                    <span class="pinned-title">📌 置顶标签页</span>
+                </div>
+                <div id="pinned-list" class="pinned-list">
+                    <!-- 置顶标签页将通过JavaScript动态添加 -->
+                </div>
+            </div>
+
+            <!-- 普通标签页列表 -->
             <div id="tabs-list" class="tabs-list hidden">
                 <!-- 标签页项目将通过JavaScript动态添加 -->
             </div>
@@ -63,6 +73,23 @@
                 清空历史
             </button>
         </footer>
+
+        <!-- 右键菜单 -->
+        <div id="context-menu" class="context-menu hidden">
+            <div class="context-menu-item" id="pin-tab">
+                <span class="menu-icon">📌</span>
+                <span class="menu-text">置顶</span>
+            </div>
+            <div class="context-menu-item" id="unpin-tab">
+                <span class="menu-icon">📌</span>
+                <span class="menu-text">取消置顶</span>
+            </div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item danger" id="delete-tab">
+                <span class="menu-icon">🗑️</span>
+                <span class="menu-text">删除</span>
+            </div>
+        </div>
     </div>
 
     <script src="../dist/popup.js"></script>

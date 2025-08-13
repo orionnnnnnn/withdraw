@@ -6,6 +6,7 @@ interface ClosedTab {
   favicon?: string;
   closedAt: number;
   windowId: number;
+  pinned?: boolean;
 }
 
 interface TabInfo {

@@ -6,6 +6,7 @@ interface ClosedTab {
   favicon?: string;
   closedAt: number;
   windowId: number;
+  pinned?: boolean;
 }
 
 // 移除常量定义，直接使用字符串
@@ -17,12 +18,18 @@ const elements = {
   loading: document.getElementById('loading')!,
   emptyState: document.getElementById('empty-state')!,
   tabsList: document.getElementById('tabs-list')!,
+  pinnedTabs: document.getElementById('pinned-tabs')!,
+  pinnedList: document.getElementById('pinned-list')!,
   errorState: document.getElementById('error-state')!,
   retryBtn: document.getElementById('retry-btn')! as HTMLButtonElement,
   clearAllBtn: document.getElementById('clear-all-btn')! as HTMLButtonElement,
   tabsCount: document.getElementById('tabs-count')!,
   searchInput: document.getElementById('search-input')! as HTMLInputElement,
-  clearSearchBtn: document.getElementById('clear-search-btn')! as HTMLButtonElement
+  clearSearchBtn: document.getElementById('clear-search-btn')! as HTMLButtonElement,
+  contextMenu: document.getElementById('context-menu')!,
+  pinTabBtn: document.getElementById('pin-tab')!,
+  unpinTabBtn: document.getElementById('unpin-tab')!,
+  deleteTabBtn: document.getElementById('delete-tab')!
 };
 
 /**
@@ -30,7 +37,9 @@ const elements = {
  */
 let closedTabs: ClosedTab[] = [];
 let filteredTabs: ClosedTab[] = [];
+let pinnedTabs: ClosedTab[] = [];
 let searchQuery: string = '';
+let currentContextTab: ClosedTab | null = null;
 
 /**
  * 显示指定状态，隐藏其他状态
@@ -142,38 +151,52 @@ function createTabItem(tab: ClosedTab): HTMLElement {
   
   // 点击事件
   item.addEventListener('click', () => restoreTab(tab));
-  
+
+  // 右键菜单事件
+  item.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    showContextMenu(e, tab);
+  });
+
   return item;
 }
 
 /**
- * 过滤标签页
+ * 过滤和分离标签页
  */
 function filterTabs(): void {
-  if (!searchQuery.trim()) {
-    filteredTabs = [...closedTabs];
-  } else {
+  let allTabs = [...closedTabs];
+
+  // 应用搜索过滤
+  if (searchQuery.trim()) {
     const query = searchQuery.toLowerCase();
-    filteredTabs = closedTabs.filter(tab =>
+    allTabs = allTabs.filter(tab =>
       tab.title.toLowerCase().includes(query) ||
       tab.url.toLowerCase().includes(query)
     );
   }
+
+  // 分离置顶和普通标签页
+  pinnedTabs = allTabs.filter(tab => tab.pinned).sort((a, b) => b.closedAt - a.closedAt);
+  filteredTabs = allTabs.filter(tab => !tab.pinned).sort((a, b) => b.closedAt - a.closedAt);
 }
 
 /**
  * 渲染标签页列表
  */
 function renderTabsList(): void {
+  // 清空列表
+  elements.pinnedList.innerHTML = '';
   elements.tabsList.innerHTML = '';
 
-  // 应用搜索过滤
+  // 应用搜索过滤和分离
   filterTabs();
 
   if (closedTabs.length === 0) {
     showState('empty');
     elements.clearAllBtn.disabled = true;
-  } else if (filteredTabs.length === 0 && searchQuery.trim()) {
+    elements.pinnedTabs.classList.add('hidden');
+  } else if (pinnedTabs.length === 0 && filteredTabs.length === 0 && searchQuery.trim()) {
     // 有搜索但无结果
     showState('empty');
     elements.emptyState.innerHTML = `
@@ -182,10 +205,23 @@ function renderTabsList(): void {
       <p class="empty-hint">尝试使用不同的关键词搜索</p>
     `;
     elements.clearAllBtn.disabled = false;
+    elements.pinnedTabs.classList.add('hidden');
   } else {
     showState('list');
     elements.clearAllBtn.disabled = false;
 
+    // 渲染置顶标签页
+    if (pinnedTabs.length > 0) {
+      elements.pinnedTabs.classList.remove('hidden');
+      pinnedTabs.forEach(tab => {
+        const item = createTabItem(tab);
+        elements.pinnedList.appendChild(item);
+      });
+    } else {
+      elements.pinnedTabs.classList.add('hidden');
+    }
+
+    // 渲染普通标签页
     filteredTabs.forEach(tab => {
       const item = createTabItem(tab);
       elements.tabsList.appendChild(item);
@@ -193,9 +229,9 @@ function renderTabsList(): void {
   }
 
   // 更新计数
-  const displayCount = searchQuery.trim() ? filteredTabs.length : closedTabs.length;
+  const totalDisplayed = pinnedTabs.length + filteredTabs.length;
   const countText = searchQuery.trim() ?
-    `${displayCount}/${closedTabs.length} 个标签页` :
+    `${totalDisplayed}/${closedTabs.length} 个标签页` :
     `${closedTabs.length} 个已关闭标签页`;
   elements.tabsCount.textContent = countText;
 }
@@ -292,6 +328,102 @@ function clearSearch(): void {
 }
 
 /**
+ * 显示右键菜单
+ */
+function showContextMenu(event: MouseEvent, tab: ClosedTab): void {
+  currentContextTab = tab;
+
+  // 显示/隐藏置顶/取消置顶按钮
+  if (tab.pinned) {
+    elements.pinTabBtn.classList.add('hidden');
+    elements.unpinTabBtn.classList.remove('hidden');
+  } else {
+    elements.pinTabBtn.classList.remove('hidden');
+    elements.unpinTabBtn.classList.add('hidden');
+  }
+
+  // 定位菜单
+  elements.contextMenu.style.left = `${event.clientX}px`;
+  elements.contextMenu.style.top = `${event.clientY}px`;
+  elements.contextMenu.classList.remove('hidden');
+
+  // 确保菜单不超出窗口边界
+  const rect = elements.contextMenu.getBoundingClientRect();
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+
+  if (rect.right > windowWidth) {
+    elements.contextMenu.style.left = `${windowWidth - rect.width - 5}px`;
+  }
+  if (rect.bottom > windowHeight) {
+    elements.contextMenu.style.top = `${windowHeight - rect.height - 5}px`;
+  }
+}
+
+/**
+ * 隐藏右键菜单
+ */
+function hideContextMenu(): void {
+  elements.contextMenu.classList.add('hidden');
+  currentContextTab = null;
+}
+
+/**
+ * 置顶标签页
+ */
+async function pinTab(): Promise<void> {
+  if (!currentContextTab) return;
+
+  const tabIndex = closedTabs.findIndex(tab => tab.id === currentContextTab!.id);
+  if (tabIndex !== -1) {
+    closedTabs[tabIndex].pinned = true;
+    await saveTabsToStorage();
+    renderTabsList();
+  }
+  hideContextMenu();
+}
+
+/**
+ * 取消置顶标签页
+ */
+async function unpinTab(): Promise<void> {
+  if (!currentContextTab) return;
+
+  const tabIndex = closedTabs.findIndex(tab => tab.id === currentContextTab!.id);
+  if (tabIndex !== -1) {
+    closedTabs[tabIndex].pinned = false;
+    await saveTabsToStorage();
+    renderTabsList();
+  }
+  hideContextMenu();
+}
+
+/**
+ * 删除标签页
+ */
+async function deleteTab(): Promise<void> {
+  if (!currentContextTab) return;
+
+  closedTabs = closedTabs.filter(tab => tab.id !== currentContextTab!.id);
+  await saveTabsToStorage();
+  renderTabsList();
+  hideContextMenu();
+}
+
+/**
+ * 保存标签页到存储
+ */
+async function saveTabsToStorage(): Promise<void> {
+  try {
+    await chrome.storage.local.set({
+      'closedTabs': closedTabs
+    });
+  } catch (error) {
+    console.error('保存标签页失败:', error);
+  }
+}
+
+/**
  * 初始化事件监听器
  */
 function initEventListeners(): void {
@@ -311,6 +443,23 @@ function initEventListeners(): void {
 
   // 清空搜索按钮
   elements.clearSearchBtn.addEventListener('click', clearSearch);
+
+  // 右键菜单事件
+  elements.pinTabBtn.addEventListener('click', pinTab);
+  elements.unpinTabBtn.addEventListener('click', unpinTab);
+  elements.deleteTabBtn.addEventListener('click', deleteTab);
+
+  // 点击其他地方隐藏右键菜单
+  document.addEventListener('click', (e) => {
+    if (!elements.contextMenu.contains(e.target as Node)) {
+      hideContextMenu();
+    }
+  });
+
+  // 阻止右键菜单的默认行为
+  elements.contextMenu.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  });
 }
 
 /**
